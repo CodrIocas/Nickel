@@ -1,0 +1,193 @@
+function ave()
+
+[ds,Ident] = xlsread('Dataset_1_global_volcanics','I2:BK96300');
+
+AGE=ds(:,1);
+SiO2=ds(:,3);
+MgO=ds(:,11);
+
+Element=ds(:,36);
+
+sampleN=length(AGE);
+
+% for i = 1:1:sampleN     % remove komatiites
+%     if  MgO(i)<18;
+%         Element(i)=Element(i);
+%     else
+%         Element(i)=nan;
+%     end
+% end
+%
+% for i = 1:1:sampleN     % basaltic rocks
+%     if  SiO2(i) <45 | SiO2(i) >63;
+%         Element(i)=nan;
+%     end
+% end
+
+for i = 1:1:sampleN
+    if  AGE(i)<1600 & MgO(i)>=18;
+        Element(i)=nan;
+    end
+end
+
+for i = 1:1:sampleN
+    if AGE(i)>3500;
+        Element(i)=nan;
+    end
+end
+%
+OutlierH=quantile(Element(~isnan(Element)),0.999);
+OutlierL=quantile(Element(~isnan(Element)),0.001);
+
+for i = 1:1: sampleN;
+    if Element(i)>OutlierH | Element(i)<OutlierL
+        Element(i)=nan;
+    end
+end
+
+% remove outliers for each 200 Myr-bin
+
+low = 3800;       %
+high = 4000;       %
+movestep = 200;
+sampleN=length(AGE);
+
+for j = 1:1:(low/movestep)
+    
+    BinAB=[];
+    
+    for i = 1:1:sampleN
+        if AGE(i) >= low & AGE(i) <= high
+            BinAB(i)=Element(i);
+        else
+            BinAB(i)=nan;
+        end
+    end
+    
+    OutlierH=quantile(BinAB(~isnan(BinAB)),0.95);
+    OutlierL=quantile(BinAB(~isnan(BinAB)),0.05);
+    
+    for i = 1:1: sampleN;
+        if BinAB(i)>OutlierH | BinAB(i)<OutlierL
+            Element(i)=nan;
+        end
+    end
+    
+    low = low - movestep;
+    high = high - movestep;
+    
+end
+
+Clip_ds=dataset(Ident,AGE,Element);
+
+Group_data = grpstats(Clip_ds,'Ident',{'mean'});    % Gridding
+
+export(Group_data,'XLSFile','Group_data.xlsx');
+
+%%%%%%%%%%%%%%%%%%%
+
+T=xlsread('Group_data.xlsx');
+
+AGE=T(:,2);
+Element=T(:,3);
+sampleN=length(AGE);
+
+low = 3400;
+high = 3600;
+% 
+for j = 1:1:1
+    
+    Run=j
+    dataAB=[];
+    BinAB=[];
+    AB_mean=0;
+    AB_sigma=0;
+    
+    for i = 1:1:sampleN
+        if AGE(i) >= low & AGE(i) <= high
+            BinAB(i)=Element(i);
+        else
+            BinAB(i)=nan;
+        end
+    end
+    %
+    OutlierH=quantile(BinAB(~isnan(BinAB)),0.975);
+    OutlierL=quantile(BinAB(~isnan(BinAB)),0.025);
+    
+    for i = 1:1: sampleN;   % remove the outliers
+        if BinAB(i)>OutlierH | BinAB(i)<OutlierL
+            Element(i)=nan;
+        end
+    end
+    
+    dataAB=BinAB(~isnan(BinAB));
+    n(j)=length(dataAB);
+    
+    if n(j)>=4       % less than 4 samples will not be calculated.
+        BSmean_AB = bootstrp(5000, @mean, dataAB);
+    else
+        BSmean_AB = [];
+    end
+    
+    result(j,1)=(low+high)/2;    %age
+    result(j,2)=mean(BSmean_AB);       %mean
+    result(j,3)=2*std(BSmean_AB);      %standard errors
+    result(j,4)=n(j);
+        
+end
+
+
+low = 3300;
+high = 3500;
+
+for j = 2:1:19
+    
+    Run=j
+    dataAB=[];
+    BinAB=[];
+    AB_mean=0;
+    AB_sigma=0;
+    
+    for i = 1:1:sampleN
+        if AGE(i) >= low & AGE(i) <= high
+            BinAB(i)=Element(i);
+        else
+            BinAB(i)=nan;
+        end
+    end
+
+    OutlierH=quantile(BinAB(~isnan(BinAB)),0.975);
+    OutlierL=quantile(BinAB(~isnan(BinAB)),0.025);
+    
+    for i = 1:1: sampleN;   % remove the outliers
+        if BinAB(i)>OutlierH | BinAB(i)<OutlierL
+            Element(i)=nan;
+        end
+    end
+    
+    dataAB=BinAB(~isnan(BinAB));
+    n(j)=length(dataAB);
+    
+    if n(j)>=4       % less than 4 samples will not be calculated.
+        BSmean_AB = bootstrp(5000, @mean, dataAB);
+    else
+        BSmean_AB = [];
+    end
+    
+    result(j,1)=(low+high)/2;    %age
+    result(j,2)=mean(BSmean_AB);       %mean
+    result(j,3)=2*std(BSmean_AB);      %standard errors
+    result(j,4)=n(j);
+    
+    low = low - movestep;
+    high = high - movestep;
+    
+end
+
+
+figure(1)
+errorbar(result(:,1),result(:,2),result(:,3));
+
+csvwrite('BS_gird_Ni_all.csv',result);
+
+end
