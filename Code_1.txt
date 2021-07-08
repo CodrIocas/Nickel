@@ -169,7 +169,7 @@ for j = 2:1:19
     n(j)=length(dataAB);
     
     if n(j)>=4       % less than 4 samples will not be calculated.
-        BSmean_AB = bootstrp(5000, @mean, dataAB);
+        BSmean_AB = bootstrp(10000, @mean, dataAB);
     else
         BSmean_AB = [];
     end
